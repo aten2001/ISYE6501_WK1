@@ -107,13 +107,16 @@ if (!file.exists('credit_card_data-headers.txt')) {
 }
 
 credit_data <- read.table('credit_card_data-headers.txt', header = TRUE)
+
+# Change response to either -1 or 1
+credit_data[credit_data[,11] == 0,11] = -1
 ```
 
-Judging by the naming scheme from the header, `R1` is the response and `Ai` are the predictors. The optimal C (or $\lambda$) value for a SVM classifier is found using a simple 2-nested grid search with 11 equidistant grid points (10 intervals) on each level. Initial search range is set to $C \in [50, 150]$. In-sample accuracy is used as the selection metric because the question specifically asks us not to separate data into training/validation sets. The code can be found in the corresponding section in the [Appendix](#searchC).
+Judging by the naming scheme from the header, `R1` is the response and `Ai` are the predictors. The optimal C (or $\lambda$) value for a SVM classifier is found using a simple 2-nested grid search with 11 equidistant grid points (10 intervals) on each level. Initial search range is set to $C \in [1, 101]$. In-sample accuracy is used as the selection metric because the question specifically asks us not to separate data into training/validation sets. The code can be found in the corresponding section in the [Appendix](#searchC).
 
 ```{r, results = 'hide'}
 
-result <- searchC(credit_data, range = c(50, 150), 11)
+result <- searchC(credit_data, range = c(1, 101), 11)
 
 model <- result$model
 a <- colSums(credit_data[model@SVindex, 1:10] * model@coef[[1]])
@@ -133,9 +136,9 @@ for (i in 1:length(a)) {
     }
     
     if (i < length(a)) {
-        str = paste(str, num_str, '*x_', i, ' + ', sep = '')    
+        str = paste(str, num_str, '*x_', i, 'j + ', sep = '')    
     } else {
-        str = paste(str, num_str, '*x_', i, ' + ', sep = '')
+        str = paste(str, num_str, '*x_', i, 'j + ', sep = '')
     }
 }
 
@@ -145,11 +148,10 @@ if (a0 < 0) {
     num_str = paste(a0)
 }
 
-str = paste(str, num_str, ' = 0', sep = '')
+str = paste(str, num_str, ' = y_j', sep = '')
 
 print(str)
 ```
-
 
 # Appendix
 
