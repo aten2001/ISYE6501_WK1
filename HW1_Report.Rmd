@@ -1,0 +1,335 @@
+---
+title: "ISYE6501 Week1 Homework"
+author: "Keh-Harng Feng"
+date: "May 17, 2017"
+output: 
+    bookdown::html_document2:
+        fig_caption: TRUE
+        toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, cache = FALSE)
+options(digits = 3)
+
+# importing required libraries.
+library('kernlab')
+library('kknn')
+```
+
+# Question 1
+Describe a situation or problem from your job, everyday life, current events, etc., for which a classification model would be appropriate. List some (up to 5) predictors that you might use.
+
+**Answer**: 
+
+I recently resettled in another city and had to choose what to do with my belongings prior to the move. This process can be modelled as a classification problem with four possible responses for each item I own: `take it with me`, `let the mover deal with it`, `discard`, and `sell`. Five of the strongest predictors in my own decision process are:
+
+`Monetary Value`
+
+`Sentimental Value`
+
+`Portability`
+
+`Necessity`
+
+`Importance`
+
+The first four are pretty self-explanatory. `Importance` represents the significance of information or security possessed by a particular object. For example, my social security card does not have a lot of direct monetary value or sentimental value, yet it poses great security concerns and therefore should be taken by myself.
+
+# Question 2
+The files credit_card_data.txt (without headers) and credit_card_data-headers.txt (with headers) contain a dataset with 654 data points, 6 continuous and 4 binary predictor variables. It has anonymized credit card applications with a binary response variable (last column) indicating if the application was positive or negative. The dataset is the “Credit Approval Data Set” from the UCI Machine Learning Repository (https://archive.ics.uci.edu/ml/datasets/Credit+Approval) without the categorial variables and without data points that have missing values.
+
+## Question 2.1 {#Q21}
+Using the support vector machine function ksvm contained in the R package kernlab, find a good classifier for this data. Show the equation of your classifier, and how well it classifies the data points in the full data set. (Don’t worry about test/validation data yet; we’ll cover that topic soon.)
+
+**Answer**:
+
+```{r searchC_compute}
+# Compute accuracy
+helper <- function(data, c_val) {
+    rows = nrow(data)
+    
+    model <- ksvm(R1 ~ ., data = data, type="C-svc",kernel="vanilladot",C=c_val,scaled=TRUE)
+    
+    pred <- predict(model, data[,1:10])
+    
+    ans <- list(c_val = c_val, acc = sum(pred == data[,11])/rows, model = model)
+    
+    return(ans)
+}
+
+# data: data frame to be used for model building. Last column is the response.
+# range: floating point in the form c(lower, upper). Search C in [lower, upper]. lower > 0!
+# grid_n: number of grid points (including start and end points). Number of intervals = grid_n - 1.
+# level: int indicating which level of grid search to perform (set to start at 1 initially)
+searchC <- function(data, range = c(1, 101), grid_n, level = 1) {
+    
+    # grid search for maximum acc & corresponding index
+    c_vals <- seq(range[1], range[2], length.out = grid_n)
+    
+    max_ind <- 1
+    ans <- list(acc = 0)
+    
+    for (i in 1:grid_n) {
+        temp <- helper(data, c_vals[i])
+        
+        if (temp$acc > ans$acc) {
+            max_ind <- i
+            ans <- temp
+        }
+    }
+    
+    if (level < 2) {
+        
+        if (max_ind == 1) {
+            range <- c(c_vals[max_ind], c_vals[max_ind + 2])
+        } else if (max_ind == length(c_vals)) {
+            range <- c(c_vals[max_ind - 2], c_vals[max_ind])
+        } else {
+            range <- c(c_vals[max_ind - 1], c_vals[max_ind + 1])
+        }
+        
+        return(searchC(data, range, grid_n, level+1))
+        
+    } else {
+        
+        return(ans)
+    }
+}
+```
+
+The data is loaded with the following code:
+```{r ksvm, echo = TRUE}
+if (!file.exists('credit_card_data-headers.txt')) {
+    download.file('https://d37djvu3ytnwxt.cloudfront.net/assets/courseware/v1/e39a3df780dacd5503df6a8322d72cd2/asset-v1:GTx+ISYE6501x+2T2017+type@asset+block/credit_card_data-headers.txt', 'credit_card_data-headers.txt')
+}
+
+credit_data <- read.table('credit_card_data-headers.txt', header = TRUE)
+```
+
+Judging by the naming scheme from the header, `R1` is the response and `Ai` are the predictors. The response is reformated to be either -1 or 1 and converted to a factor.
+
+```{r}
+credit_data[credit_data[,11] == 0,11] = -1
+
+credit_data[,11] = as.factor(credit_data[,11])
+
+```
+
+The optimal C (or $\lambda$) value for a SVM classifier is found using a simple 2-nested grid search with 11 equidistant grid points (10 intervals) on each level. Initial search range is set to $C \in [1, 101]$. In-sample accuracy is used as the selection metric because the question specifically asks us not to separate data into training/validation sets. The code can be found in the corresponding section in the [Appendix](#searchC).
+
+```{r, results = 'hide'}
+
+svm_result <- searchC(credit_data, range = c(1, 101), grid_n =11)
+
+model <- svm_result$model
+a <- colSums(credit_data[model@SVindex, 1:10] * model@coef[[1]])
+
+a0 <- sum(a*credit_data[1, 1:10]) - model@b
+
+```
+The final selected model is the one with the highest in-sample accuracy. It can be written as
+
+```{r, eval = FALSE}
+str = ""
+for (i in 1:length(a)) {
+    if (a[i] < 0) {
+        num_str = paste('(', a[i], ')', sep = '')
+    } else {
+        num_str = paste(a[i])
+    }
+    
+    if (i < length(a)) {
+        str = paste(str, num_str, '*x_', i, 'j + ', sep = '')    
+    } else {
+        str = paste(str, num_str, '*x_', i, 'j + ', sep = '')
+    }
+}
+
+if (a0 < 0) {
+    num_str = paste('(', a0, ')', sep = '')
+} else {
+    num_str = paste(a0)
+}
+
+str = paste(str, num_str, ' = y_j', sep = '')
+
+print(str)
+```
+
+## Question 2.2
+Using the k-nearest-neighbors classification function kknn contained in the R kknn package, suggest a good value of k, and show how well it classifies that data points in the full data set. Don’t forget to scale the data (scale=TRUE in kknn).
+
+**Answer**:
+
+The `kknn` library provides a leave-one-out training subroutine `train.kknn` that also optimizes the selection of k-value. Since the data has already been reformatted to specify a categorical response in [Question 2.1](#Q21) the predicted response will be set to the proper nominal types and won't be continuous. The code is shown below:
+```{r searchK_compute, echo = TRUE}
+
+knn_data <- credit_data
+
+knn_data[, 11] = factor(knn_data[, 11])
+
+knn_model <- train.kknn(R1 ~ ., data = knn_data)
+
+optimal_k <- knn_model$best.parameters$k
+
+knn_acc <- 1 - min(knn_model$MISCLASS)
+```
+
+Please note that the use of leave-one-out sampling by `train.kknn` means models are trained on all data points besides the one to be predicted. This means it is not necessary to manually indicate leaving current data point out with `data[-i, ]` then iterating through all data points. The optimal k is found to be `r optimal_k` and the corresponding model accuracy is `r knn_acc`. A comparison of the model prediction and actual response is shown in Figure (#TODO).
+
+# Question 3
+Using the same data set as Question 2 use the ksvm or kknn function to find a good classifier:
+(a) using cross-validation for the k-nearest-neighbors model; and
+(b) splitting the data into training, validation, and test data sets.
+
+**Answer**:
+
+Personally I feel the wording of question 3 is a bit unclear. The following summarizes my solution and its logic:
+
+- The data set will be split into a training set (90%) and a test set (10%) initially.
+
+For part a:
+
+- 10-fold cross-validation will be used to obtain estimates of out-of-sample accuracies for both `ksvm` and `kknn` models on the training set.
+- The model type with the better accuracy estimate will be selected and the entire training set will be used to train the selected model type.
+- The actual out-of-sample accuracy will be computed using the test set.
+
+For part b:
+
+- The training set will be further split into a training (80%) and validation (10%) set.
+- Estimates of out-of-sample accuracies will be obtained by testing the model on the validation set. This shall serve as the metric for selecting the better model type.
+- The selected model will be used for prediction on the test set directly for computation of the actual out-of-sample accuracy.
+
+The real out-of-sample accuracies will serve as the performance metric between the methods utilized in a and b.
+
+## Data Preparation
+The data set is subsetted into training and test sets using random sampling without replacement (not stratified) with roughly a 90%/10% split:
+```{r, echo = TRUE}
+set.seed(123)
+n <- nrow(credit_data)
+intrain <- sample(1:n, size = ceiling(n*9/10))
+
+data.train <- credit_data[intrain,]
+data.test <- credit_data[-intrain,]
+```
+
+## Part A
+Cross-validation with ksvm is supported by the built-in `cross = k` argument. It should be noted that the optimal C-value found in [Question 2.1](#2-1), C = `r svm_result$c_val` is used here. The code below computes the ksvm OOS accuracy estimation using 10-fold cross-validation:
+```{r, ksvm-cv, echo = TRUE, results = 'hide'}
+svm_cv <- ksvm(R1 ~ ., data = data.train, type = 'C-svc', kernel = 'vanilladot', C = svm_result$c_val, cross = 10, scaled = TRUE)
+
+svm_cvacc <- 1 - svm_cv@cross
+
+```
+
+Cross-validation with kknn is supported by the cv.kknn subroutine. A 10-fold cross-validation to compute the out-of-sample accuracy estimation is carried out using the code below:
+```{r kknn-cv, echo = TRUE}
+set.seed(123)
+knn_cv <- cv.kknn(R1 ~ ., data = data.train, k = optimal_k, kcv = 10, scale = TRUE)
+
+knn_cvacc <- sum(knn_cv[[1]][,1] == knn_cv[[1]][,2])/nrow(knn_cv[[1]])
+```
+
+Under 10-fold cross-validation, `ksvm` achieved an OOS accuracy estimate of `r svm_cvacc` while `kknn` reached `r knn_cvacc`. Please note that clustering in knn is a random process and as such the model and its corresponding OOS accuracy estimation is not fixed even if the training set used has not been changed. The above result is obtained with the random seed set to `123` to guarantee reproducibility.
+
+From the OOS accuracy estimate `ksvm` is selected to be the better model.
+
+## Part B
+The training set is further split into a validation set (10% of total data) and training set (80% of total data) with the following code:
+```{r, echo = TRUE}
+set.seed(123)
+valid <- sample(1:nrow(data.train), size = ceiling(n*1/10))
+
+b.train <- data.train[-valid,]
+b.valid <- data.train[valid,]
+```
+
+Code for validation test using ksvm and kknn is shown below:
+```{r, echo = TRUE, results = 'hide'}
+set.seed(123)
+svm_val <- ksvm(R1 ~ ., data = b.train, type = 'C-svc', kernel = 'vanilladot', C = svm_result$c_val, scaled = TRUE)
+pred_val <- predict(svm_val, b.valid[,1:10])
+svm_valacc <- sum(pred_val == b.valid[,11])/nrow(b.valid)
+
+knn_val <- kknn(R1 ~ ., b.train, b.valid, k = optimal_k, scale = TRUE)
+knn_valacc <- sum(knn_val$fitted.values == b.valid[,11])/nrow(b.valid)
+```
+
+Validation test yields OOS accuracy estimate of `r svm_valacc` for `ksvm` and `r knn_valacc` for `kknn`. Based on this result, knn is selected. This is different from the result found in Part A.
+
+## Evaluation of Final Model Performance
+Since Part A and B reached conflicting conclusions, it is now interesting to see what will happen when we compare the final model performance by checking the actual out-of-sample performance on the test set. Code is shown below:
+
+```{r, echo = TRUE, results = 'hide'}
+set.seed(123)
+svm_final <- ksvm(R1 ~ ., data = data.train, type = 'C-svc', kernel = 'vanilladot', C = svm_result$c_val, scaled = TRUE)
+pred_oos <- predict(svm_final, data.test[,1:10])
+svm_oosacc <- sum(pred_oos == data.test[,11])/nrow(data.test)
+
+knn_final <- kknn(R1 ~ ., data.train, data.test, k = optimal_k, scale = TRUE)
+knn_oosacc <- sum(knn_final$fitted.values == data.test[,11])/nrow(data.test)
+```
+
+The model selected using cross-validation, `ksvm`, yields the better OOS accuracy at `r svm_oosacc` compared to `kknn`'s accuracy at `r knn_oosacc`. This is perhaps not a surprising outcome, considering that 10-fold cross-validation is quite robust at accounting for data structures that may have become hidden during the data splitting process. It is usually more accurate when it comes to determining OOS accuracy estimation.
+
+# Appendix
+
+## KSVM 2-Nested Grid Search for C value {#searchC}
+A 2-nested grid search means a coarse grid is first used to get a general sense of where the maximum is located, then a finer grid is used to zoom in on the parameter value corresponding to the maximum. In this case, the maximum of interest is the in-sample prediction accuracy and the parameter is C.
+```{r searchC, eval = FALSE, echo = TRUE}
+require('kernlab')
+
+# Compute accuracy
+helper <- function(data, c_val) {
+    rows = nrow(data)
+    
+    model <- ksvm(as.matrix(data[,1:10]), data[,11], type="C-svc",kernel="vanilladot",C=c_val,scaled=TRUE)
+    
+    pred <- predict(model, data[,1:10])
+    
+    ans <- list(c_val = c_val, acc = sum(pred == data[,11])/rows, model = model)
+    
+    return(ans)
+}
+
+# data: data frame to be used for model building. Last column is the response.
+# range: floating point in the form c(lower, upper). Search C in [lower, upper]. lower > 0!
+# grid_n: number of grid points (including start and end points). Number of intervals = grid_n - 1.
+# level: int indicating which level of grid search to perform (set to start at 1 initially)
+searchC <- function(data, range = c(1, 101), grid_n, level = 1) {
+    
+    # grid search for maximum acc & corresponding index
+    c_vals <- seq(range[1], range[2], length.out = grid_n)
+    
+    max_ind <- 1
+    temp <- list()
+    ans <- list(acc = 0)
+    
+    for (i in 1:grid_n) {
+        temp <- helper(data, c_vals[i])
+        
+        if (temp$acc[1] > ans$acc) {
+            max_ind <- i
+            ans <- temp
+        }
+    }
+    
+    if (level < 2) {
+        
+        if (max_ind == 1) {
+            range <- c(c_vals[max_ind], c_vals[max_ind + 2])
+        } else if (max_ind == length(c_vals)) {
+            range <- c(c_vals[max_ind - 2], c_vals[max_ind])
+        } else {
+            range <- c(c_vals[max_ind - 1], c_vals[max_ind + 1])
+        }
+        
+        return(searchC(data, range, grid_n, level+1))
+        
+    } else {
+        
+        return(ans)
+    }
+}
+```

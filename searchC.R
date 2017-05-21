@@ -1,15 +1,12 @@
-require('kernlab')
-
 # Compute accuracy
 helper <- function(data, c_val) {
     rows = nrow(data)
-    cols = ncol(data)
     
-    model <- ksvm(as.matrix(data[,1:cols-1]), as.factor(data[,cols]), type="C-svc",kernel="vanilladot",C=c_val,scaled=TRUE)
+    model <- ksvm(as.matrix(data[,1:10]), as.factor(data[,11]), type="C-svc",kernel="vanilladot",C=c_val,scaled=TRUE)
     
-    pred <- predict(model, data[,1:cols-1])
+    pred <- predict(model, data[,1:10])
     
-    ans <- list(c_val = c_val, acc = sum(pred == data[,cols])/rows, model = model)
+    ans <- list(c_val = c_val, acc = sum(pred == data[,11])/rows, model = model)
     
     return(ans)
 }
@@ -23,15 +20,15 @@ searchC <- function(data, range = c(1, 101), grid_n, level = 1) {
     # grid search for maximum acc & corresponding index
     c_vals <- seq(range[1], range[2], length.out = grid_n)
     
-    max_acc <- 0
     max_ind <- 1
-    ans <- list()
+    ans <- list(acc = 0)
+    
     for (i in 1:grid_n) {
-        ans <- helper(data, c_vals[i])
+        temp <- helper(data, c_vals[i])
         
-        if (ans$acc[1] > max_acc) {
+        if (temp$acc[1] > ans$acc) {
             max_ind <- i
-            max_acc <- ans$acc
+            ans <- temp
         }
     }
     
