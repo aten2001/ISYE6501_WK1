@@ -3,13 +3,13 @@ title: "ISYE6501 Week1 Homework"
 author: "Keh-Harng Feng"
 date: "May 17, 2017"
 output: 
-    bookdown::html_document2:
+    bookdown::pdf_book:
         fig_caption: TRUE
-        toc: TRUE
+        toc: FALSE
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, cache = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, cache = FALSE, tidy = TRUE)
 options(digits = 3)
 
 # importing required libraries.
@@ -22,7 +22,17 @@ Describe a situation or problem from your job, everyday life, current events, et
 
 **Answer**: 
 
-I recently resettled in another city and had to choose what to do with my belongings prior to the move. This process can be modelled as a classification problem with four possible responses for each item I own: `take it with me`, `let the mover deal with it`, `discard`, and `sell`. Five of the strongest predictors in my own decision process are:
+I recently resettled in another city and had to choose what to do with my belongings prior to the move. This process can be modelled as a classification problem with four possible responses for each item I own: 
+
+`take it with me`
+
+`let the mover deal with it`
+
+`discard`
+
+`sell`
+
+Five of the strongest predictors in my own decision process are:
 
 `Monetary Value`
 
@@ -98,8 +108,7 @@ searchC <- function(data, range = c(1, 101), grid_n, level = 1) {
 }
 ```
 
-The data is loaded with the following code:
-```{r ksvm, echo = TRUE}
+```{r}
 if (!file.exists('credit_card_data-headers.txt')) {
     download.file('https://d37djvu3ytnwxt.cloudfront.net/assets/courseware/v1/e39a3df780dacd5503df6a8322d72cd2/asset-v1:GTx+ISYE6501x+2T2017+type@asset+block/credit_card_data-headers.txt', 'credit_card_data-headers.txt')
 }
@@ -107,9 +116,9 @@ if (!file.exists('credit_card_data-headers.txt')) {
 credit_data <- read.table('credit_card_data-headers.txt', header = TRUE)
 ```
 
-Judging by the naming scheme from the header, `R1` is the response and `Ai` are the predictors. The response is reformated to be either -1 or 1 and converted to a factor.
+Judging by the naming scheme from the data header, `R1` is the response and `Ai` are the predictors. The response is reformated to be either -1 or 1 and converted to a factor in the following code.
 
-```{r}
+```{r data-prep, echo = TRUE}
 credit_data[credit_data[,11] == 0,11] = -1
 
 credit_data[,11] = as.factor(credit_data[,11])
@@ -164,12 +173,7 @@ Using the k-nearest-neighbors classification function kknn contained in the R kk
 
 The `kknn` library provides a leave-one-out training subroutine `train.kknn` that also optimizes the selection of k-value. Since the data has already been reformatted to specify a categorical response in [Question 2.1](#Q21) the predicted response will be set to the proper nominal types and won't be continuous. The code is shown below:
 ```{r searchK_compute, echo = TRUE}
-
-knn_data <- credit_data
-
-knn_data[, 11] = factor(knn_data[, 11])
-
-knn_model <- train.kknn(R1 ~ ., data = knn_data)
+knn_model <- train.kknn(R1 ~ ., data = credit_data)
 
 optimal_k <- knn_model$best.parameters$k
 
