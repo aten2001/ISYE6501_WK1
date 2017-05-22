@@ -3,7 +3,7 @@ title: "ISYE6501 Week1 Homework"
 author: "Keh-Harng Feng"
 date: "May 17, 2017"
 output: 
-    bookdown::pdf_book:
+    bookdown::html_document2:
         fig_caption: TRUE
         toc: FALSE
 ---
@@ -127,16 +127,41 @@ credit_data[,11] = as.factor(credit_data[,11])
 
 The optimal C (or $\lambda$) value for a SVM classifier is found using a simple 2-nested grid search with 11 equidistant grid points (10 intervals) on each level. Initial search range is set to $C \in [1, 101]$. In-sample accuracy is used as the selection metric because the question specifically asks us not to separate data into training/validation sets. The code can be found in the corresponding section in the [Appendix](#searchC).
 
-```{r, results = 'hide'}
+```{r, results = 'hide', cache = TRUE}
 
 svm_result <- searchC(credit_data, range = c(1, 101), grid_n =11)
 
-model <- svm_result$model
-a <- colSums(credit_data[model@SVindex, 1:10] * model@coef[[1]])
+svm_model <- svm_result$model
+a <- colSums(credit_data[svm_model@SVindex, 1:10] * svm_model@coef[[1]])
 
-a0 <- sum(a*credit_data[1, 1:10]) - model@b
+a0 <- sum(a*credit_data[1, 1:10]) - svm_model@b
 
 ```
+
+Note that the handout provides sample code to calculate the intercept of the line equation for the decision boundary, a0, as follows:
+`a0 <- sum(a*credit_data[1, 1:10]) - svm_model@b`
+
+This is in fact, wrong, as pointed out in [this post](https://courses.edx.org/courses/course-v1:GTx+ISYE6501x+2T2017/discussion/forum/e5a13cc2293199bc578fa24b995945f3b69f050a/threads/5920e8de22a8fb079f00052f) by user [shaunbrophy](https://courses.edx.org/u/shaunbrophy). The actual intercept of the decision boundary is just `svm_model@b` itself. With that in mind, the decision boundary equation can be written as follows:
+
+$\bar{w}^T \bar{x} + b = 0$
+
+where
+
+b = `r svm_model@b`
+
+x = centered & normalized predictors
+
+and 
+
+w =
+
+```{r}
+a
+```
+
+**Digression:** If one is to write a line with equation $\bar{w}^T\bar{x} + a0 = 0$ this is in fact the line that contains support vectors with classification response +1. This line is sometimes referred to as the *upper gutter line*.
+
+
 The final selected model is the one with the highest in-sample accuracy. It can be written as
 
 ```{r, eval = FALSE}
