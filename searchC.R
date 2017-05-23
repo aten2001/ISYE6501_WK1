@@ -1,12 +1,13 @@
 # Compute accuracy
-helper <- function(data, c_val) {
-    rows = nrow(data)
+helper <- function(train_set, test_set, c_val) {
     
-    model <- ksvm(as.matrix(data[,1:10]), as.factor(data[,11]), type="C-svc",kernel="vanilladot",C=c_val,scaled=TRUE)
+    model <- ksvm(R1 ~ ., data = train_set, type="C-svc",kernel="vanilladot",C=c_val,scaled=TRUE)
     
-    pred <- predict(model, data[,1:10])
+    pred <- predict(model, test_set[,1:10])
     
-    ans <- list(c_val = c_val, acc = sum(pred == data[,11])/rows, model = model)
+    ans <- list(c_val = c_val, acc = sum(pred == test_set[,11])/nrow(test_set), model = model)
+    
+    print(paste('C =', c_val, 'Acc:', ans$acc))
     
     return(ans)
 }
@@ -15,7 +16,7 @@ helper <- function(data, c_val) {
 # range: floating point in the form c(lower, upper). Search C in [lower, upper]. lower > 0!
 # grid_n: number of grid points (including start and end points). Number of intervals = grid_n - 1.
 # level: int indicating which level of grid search to perform (set to start at 1 initially)
-searchC <- function(data, range = c(1, 101), grid_n, level = 1) {
+searchC <- function(train_set, test_set, range = c(0.0001, 1), grid_n, level = 1) {
     
     # grid search for maximum acc & corresponding index
     c_vals <- seq(range[1], range[2], length.out = grid_n)
@@ -24,9 +25,9 @@ searchC <- function(data, range = c(1, 101), grid_n, level = 1) {
     ans <- list(acc = 0)
     
     for (i in 1:grid_n) {
-        temp <- helper(data, c_vals[i])
+        temp <- helper(train_set, test_set, c_vals[i])
         
-        if (temp$acc[1] > ans$acc) {
+        if (temp$acc > ans$acc) {
             max_ind <- i
             ans <- temp
         }
@@ -42,7 +43,7 @@ searchC <- function(data, range = c(1, 101), grid_n, level = 1) {
             range <- c(c_vals[max_ind - 1], c_vals[max_ind + 1])
         }
         
-        return(searchC(data, range, grid_n, level+1))
+        return(searchC(train_set, test_set, range, grid_n, level+1))
         
     } else {
         
